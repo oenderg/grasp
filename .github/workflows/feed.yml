@@ -1,0 +1,89 @@
+name: feed
+
+on:
+  schedule:
+    - cron: "37 */6 * * *"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: rewrite the feed even if it already has this version
+        type: boolean
+        default: false
+
+concurrency:
+  group: feed
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+env:
+  GH_TOKEN: ${{ github.token }}
+
+jobs:
+  feed:
+    runs-on: macos-26
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Find the latest release
+        id: latest
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 1 --json tagName --jq '.[0].tagName // ""')
+          if [ -z "$tag" ]; then
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          version=${tag#v}
+          if [ "${{ inputs.force }}" != "true" ] && grep -q "<sparkle:version>$version</sparkle:version>" appcast.xml 2>/dev/null; then
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "feed already has $version"
+          else
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            echo "tag=$tag" >> "$GITHUB_OUTPUT"
+            echo "version=$version" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Download the image
+        if: steps.latest.outputs.found == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          gh release download "${{ steps.latest.outputs.tag }}" --repo "$GITHUB_REPOSITORY" --pattern 'Grasp-*.dmg' --dir dist
+
+      - name: Install OpenSSL
+        if: steps.latest.outputs.found == 'true'
+        shell: bash
+        run: brew install openssl@3 || true
+
+      - name: Write the feed
+        if: steps.latest.outputs.found == 'true'
+        shell: bash
+        env:
+          SPARKLE_ED_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          version="${{ steps.latest.outputs.version }}"
+          python3 appcast.py \
+            "dist/Grasp-$version.dmg" \
+            "$version" \
+            "https://github.com/$GITHUB_REPOSITORY/releases/download/v$version/Grasp-$version.dmg" \
+            appcast.xml \
+            "$GITHUB_REPOSITORY"
+
+      - name: Commit the feed
+        if: steps.latest.outputs.found == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add appcast.xml
+          git commit -m "feed ${{ steps.latest.outputs.version }}"
+          git push origin HEAD:main

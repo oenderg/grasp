@@ -1,0 +1,121 @@
+name: sync
+
+on:
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: rebuild the current upstream version
+        type: boolean
+        default: false
+
+concurrency:
+  group: sync
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  actions: write
+
+env:
+  UPSTREAM: ${{ vars.UPSTREAM_REPO }}
+  GH_TOKEN: ${{ github.token }}
+
+jobs:
+  publish:
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Look for a new upstream release
+        id: check
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag=$(gh api "repos/$UPSTREAM/releases/latest" --jq .tag_name)
+          version=${tag#v}
+          if [ "${{ inputs.force }}" != "true" ] && gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "already have $tag"
+          else
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            echo "tag=$tag" >> "$GITHUB_OUTPUT"
+            echo "version=$version" >> "$GITHUB_OUTPUT"
+            echo "new release: $tag"
+          fi
+
+      - name: Download the upstream image
+        if: steps.check.outputs.found == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir upstream
+          gh release download "${{ steps.check.outputs.tag }}" --repo "$UPSTREAM" --pattern '*.dmg' --dir upstream
+          test -n "$(find upstream -maxdepth 1 -name '*.dmg' -print -quit)"
+
+      - name: Prepare the signing key
+        id: sign
+        if: steps.check.outputs.found == 'true'
+        shell: bash
+        env:
+          P12: ${{ secrets.SIGNING_P12_BASE64 }}
+          P12_PASSWORD: ${{ secrets.SIGNING_P12_PASSWORD }}
+        run: |
+          set -euo pipefail
+          keychain="$RUNNER_TEMP/build.keychain-db"
+          password=$(uuidgen)
+          security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 3600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          printf '%s' "$P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -k "$keychain" -P "$P12_PASSWORD" -A >/dev/null
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$password" "$keychain" >/dev/null
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+          security default-keychain -s "$keychain"
+          security find-certificate -a -p "$keychain" > "$RUNNER_TEMP/cert.pem"
+          openssl x509 -in "$RUNNER_TEMP/cert.pem" -outform der -out "$RUNNER_TEMP/cert.der"
+          sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain "$RUNNER_TEMP/cert.der"
+          identity="${{ secrets.SIGN_IDENTITY }}"
+          test -n "$identity"
+          echo "keychain=$keychain" >> "$GITHUB_OUTPUT"
+          echo "identity=$identity" >> "$GITHUB_OUTPUT"
+
+      - name: Install OpenSSL
+        if: steps.check.outputs.found == 'true'
+        shell: bash
+        run: brew install openssl@3 || true
+
+      - name: Edit, sign and package
+        if: steps.check.outputs.found == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          dmg=$(find upstream -maxdepth 1 -name '*.dmg' -print -quit)
+          python3 build.py \
+            --upstream "$UPSTREAM" \
+            --dmg "$dmg" \
+            --version "${{ steps.check.outputs.version }}" \
+            --identity "${{ steps.sign.outputs.identity }}" \
+            --keychain "${{ steps.sign.outputs.keychain }}" \
+            --appcast-url "https://raw.githubusercontent.com/$GITHUB_REPOSITORY/main/appcast.xml"
+
+      - name: Publish the release
+        if: steps.check.outputs.found == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${{ steps.check.outputs.version }}"
+          if gh release view "v$version" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release delete "v$version" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes
+          fi
+          gh release create "v$version" "dist/Grasp-$version.dmg" --title "$version" --notes "" --target main
+          gh workflow run feed.yml --repo "$GITHUB_REPOSITORY" -f force=true
+
+      - name: Remove the signing key
+        if: always() && steps.sign.outputs.keychain != ''
+        shell: bash
+        run: security delete-keychain "${{ steps.sign.outputs.keychain }}" || true
