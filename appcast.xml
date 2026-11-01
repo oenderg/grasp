@@ -7,7 +7,7 @@
     <language>en</language>
     <item>
       <title>3.4.0</title>
-      <pubDate>Sun, 01 Nov 2026 14:40:39 GMT</pubDate>
+      <pubDate>Sun, 01 Nov 2026 14:50:39 GMT</pubDate>
       <sparkle:version>3.4.0</sparkle:version>
       <sparkle:shortVersionString>3.4.0</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
@@ -15,9 +15,9 @@
       <enclosure url="https://github.com/oenderg/grasp/releases/download/v3.4.0/Grasp-3.4.0.dmg"
                  sparkle:version="3.4.0"
                  sparkle:shortVersionString="3.4.0"
-                 length="43095217"
+                 length="43095247"
                  type="application/octet-stream"
-                 sparkle:edSignature="+aiOj7sDmpTS3+7hXMNsutnZmazphHtsajN9gX9s6BHXcMXmzWnnMp+8b/umjfjYdrLwNNloI1vitygzXmbEAg==" />
+                 sparkle:edSignature="6w+HeBn2Pn4AkRU5tX+q3GYRdxSXX1ZyrUcNJDdY6pYCKfxtCJbVSS3bkFRXxwFxoKpNxRvI2nUszljI4Ds4AQ==" />
     </item>
   </channel>
 </rss>
