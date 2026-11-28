@@ -6,18 +6,18 @@
     <description>Paywall-free macOS builds.</description>
     <language>en</language>
     <item>
-      <title>3.6.5</title>
-      <pubDate>Tue, 24 Nov 2026 15:50:12 GMT</pubDate>
-      <sparkle:version>3.6.5</sparkle:version>
-      <sparkle:shortVersionString>3.6.5</sparkle:shortVersionString>
+      <title>3.6.6</title>
+      <pubDate>Sat, 28 Nov 2026 16:50:55 GMT</pubDate>
+      <sparkle:version>3.6.6</sparkle:version>
+      <sparkle:shortVersionString>3.6.6</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-      <sparkle:releaseNotesLink>https://github.com/oenderg/grasp/releases/tag/v3.6.5</sparkle:releaseNotesLink>
-      <enclosure url="https://github.com/oenderg/grasp/releases/download/v3.6.5/Grasp-3.6.5.dmg"
-                 sparkle:version="3.6.5"
-                 sparkle:shortVersionString="3.6.5"
-                 length="47724089"
+      <sparkle:releaseNotesLink>https://github.com/oenderg/grasp/releases/tag/v3.6.6</sparkle:releaseNotesLink>
+      <enclosure url="https://github.com/oenderg/grasp/releases/download/v3.6.6/Grasp-3.6.6.dmg"
+                 sparkle:version="3.6.6"
+                 sparkle:shortVersionString="3.6.6"
+                 length="47762136"
                  type="application/octet-stream"
-                 sparkle:edSignature="n6q3E7HCvdiNvm7TzJIjL15N/QWvD7AidBsCfXibqxssiKXSu3xF0lC52xymrpZyHB4GvnyseWeCXssXeYfFBw==" />
+                 sparkle:edSignature="m3USdZmmSurvcFRPGAKRHrA8aQegtlV+sn0gIgx99WYufVANBJJtseSrWGxMZpA+Aev+c8FgjRhHkYIJtq4xBQ==" />
     </item>
   </channel>
 </rss>
